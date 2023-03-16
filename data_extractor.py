@@ -23,6 +23,8 @@ def dataset_loader(stock_name):
     '''
     Load stock data.
     '''
+    # Replace all . with - in stock name (e.g. BRK.B -> BRK-B)
+    stock_name = stock_name.replace('.', '-')
     data = yf.download(stock_name, progress=False) # progress=false to avoid printing progress bar
     return data
 
@@ -46,7 +48,7 @@ def create_dataset(stock_names, data_folder):
             print(e)
 
 
-def update_dataset(stock_names, data_folder):
+def update_dataset(stock_names, data_folder, force=False):
     '''
     Given an array of stock tickers and a data folder, 
     append today's data to the end of the csv for each stock.
@@ -59,8 +61,11 @@ def update_dataset(stock_names, data_folder):
         stock_count += 1
 
         # Get the date of the latest row of data
-        last_date = pd.read_csv(data_folder + stock_name + '.csv').tail(1)['Date'].values[0]
-        last_date = datetime.datetime.strptime(last_date, '%Y-%m-%d').strftime('%Y-%m-%d')
+        try:
+            last_date = pd.read_csv(data_folder + stock_name + '.csv').tail(1)['Date'].values[0]
+            last_date = datetime.datetime.strptime(last_date, '%Y-%m-%d').strftime('%Y-%m-%d')
+        except:
+            print("Error getting last date for " + stock_name + " [" + str(stock_count) + "/" + str(len(stock_names)) + "]")
 
         # Check if today's date is greater than the last date
         today = datetime.datetime.today().strftime('%Y-%m-%d')
@@ -89,6 +94,18 @@ def update_dataset(stock_names, data_folder):
             print(e)
 
 
+def dataloader(stock_name, data_folder, start_date, end_date):
+    '''
+    Given a stock ticker, data folder, start date and end date, load the data
+    from the csv file and return it as a pandas dataframe.
+    It loads data from start_date to end_date inclusive, unless end_date is past the latest date.
+    '''
+    with open(data_folder + stock_name + '.csv', mode='r') as f:
+        data = pd.read_csv(f)
+        data = data[(data['Date'] >= start_date) & (data['Date'] <= end_date)]
+        return data
+
+
 if __name__ == "__main__":
     stock_names = get_stock_names()
     print(len(stock_names))
@@ -98,4 +115,8 @@ if __name__ == "__main__":
     create_dataset(stock_names, 'data/')
 
     # This is the function you run daily to update the dataset with new data
-    # update_dataset(stock_names, 'data/')
+    # update_dataset(stock_names, 'data/', force=True)
+
+    # This is how you load the data
+    data = dataloader('AAPL', 'data/', '2023-03-07', '2023-03-10')
+    print(data)
