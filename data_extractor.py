@@ -1,6 +1,5 @@
 import datetime
 import os
-import pandas_datareader
 import requests
 import pandas as pd
 import yfinance as yf
@@ -106,10 +105,36 @@ def dataloader(stock_name, data_folder, start_date, end_date):
         return data
 
 
+def label_buy_sell_hold(data, threshold=0.02):
+    '''
+    Given a column of values, calculate for each value the average of the next 5 values (1 week).
+    If the value is [threshold] greater than the current price, append 1 for buy to the labels array.
+    If the value is [threshold] less than the current price, append 2 for sell to the labels array.
+    Otherwise, append 0 for hold.
+    You can change the threshold to fit your trading risk tolerance.
+    '''
+    # Convert data from (124, 1) to (124,)
+    data = data.reshape(-1)
+    labels = []
+    for i in range(len(data)):
+        if i + 5 < len(data):
+            avg = data[i+1:i+6].mean()
+            if avg > data[i] * 1 + threshold:
+                labels.append(1)
+            elif avg < data[i] * 1 - threshold:
+                labels.append(2)
+            else:
+                labels.append(0)
+        else: # If the last 5 values are not available, append whatever the last value is
+            labels.append(labels[-1])
+    
+    return labels # Labels is a list of 0, 1 or 2
+
+
 if __name__ == "__main__":
     stock_names = get_stock_names()
-    print(len(stock_names))
-    print(stock_names)
+    # print(len(stock_names))
+    # print(stock_names)
 
     # This will download the entire history for each stock and save it to the data folder
     create_dataset(stock_names, 'data/')
