@@ -102,51 +102,63 @@ def train_model(data, model, window_size, episodes, batch_size=32):
         model.model.save("models/model_multifeature.h5")
 
 
+def train_multistock(stocks, start_date, end_date, window_size, episodes, batch_size=32):
+    '''
+    Given a list of stocks, fit the model to all the stocks.  
+    '''
+    trader = None
+    for stock in stocks:
+        print(f"Loading data for {stock}...")
+        data = dataloader(stock, 'data/', start_date, end_date)
+
+        # We want to predict the closing price, but we also want to use the other features
+        data = data[['Close']].values
+
+        # Generate and append the buy/sell/hold signal to the data
+        labels = np.array(label_buy_sell_hold(data))
+
+        # Convert labels to 2D array of size (len(labels), 1)
+        labels = labels.reshape(len(labels), 1)
+        data = np.append(data, labels, axis=1)
+
+        # Get the epsCurrentYear, epsForward, forwardPE, fiftyDayAverage, marketCap
+        df = web.get_quote_yahoo(stock)
+        df = df[["epsCurrentYear", "epsForward", "forwardPE", "fiftyDayAverage", "marketCap"]]
+
+        # Extend df to match the length of data
+        df = pd.concat([df] * len(data), ignore_index=True)
+        
+        # Append the epsCurrentYear, epsForward, forwardPE, fiftyDayAverage, marketCap to data
+        data = np.append(data, df, axis=1)
+
+        # Create the model only once during the first iteration of the loop
+        if not trader:
+            print("Model created.")
+            trader = Model(window_size, num_features=data.shape[1])
+            trader.model = trader.model_builder()
+            # trader.model.summary()
+        
+        print(f"Training model for {stock}...")
+        train_model(data, trader, window_size, episodes, batch_size)
+
+
 if __name__ == "__main__":
     # Hyperparameters  
     window_size = 10
     episodes = 10
     batch_size = 32
     stock = 'AAPL'
+    stocks = ['AAPL', 'MSFT', 'AMZN', 'GOOG', 'FB', 'TSLA']
+    start_date = '2022-09-01'
+    end_date = '2023-03-01'
     
-    data = dataloader(stock, 'data/', '2022-09-01', '2023-03-01')
-    
-    # We want to predict the closing price, but we also want to use the other features
-    data = data[['Close']].values
-
-    # Generate and append the buy/sell/hold signal to the data
-    labels = np.array(label_buy_sell_hold(data))
-
-    # Convert labels to 2D array of size (len(labels), 1)
-    labels = labels.reshape(len(labels), 1)
-    data = np.append(data, labels, axis=1)
-
-    # Get the epsCurrentYear, epsForward, forwardPE, fiftyDayAverage, marketCap
-    df = web.get_quote_yahoo(stock)
-    df = df[["epsCurrentYear", "epsForward", "forwardPE", "fiftyDayAverage", "marketCap"]]
-
-    # Extend df to match the length of data
-    df = pd.concat([df] * len(data), ignore_index=True)
-    
-    # Append the epsCurrentYear, epsForward, forwardPE, fiftyDayAverage, marketCap to data
-    data = np.append(data, df, axis=1)
-
-    trader = Model(window_size, num_features=data.shape[1])
-    trader.model = trader.model_builder()
-    # trader.model.summary()
-    
-    train_model(data, trader, window_size, episodes, batch_size)
+    train_multistock(stocks, start_date, end_date, window_size, episodes, batch_size)
 
     ### Testing the model ###
-
-    # Load the model
-    trader.model = trader.model_builder()
-    trader.model.load_weights("models/model_multifeature.h5")
     
     # Get the current date
     # today = datetime.today().strftime('%Y-%m-%d')
     today = '2022-08-25'
-    today = '2022-07-21'
 
     # Get the date from a week ago
     week_ago = (datetime.strptime(today, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
@@ -171,6 +183,12 @@ if __name__ == "__main__":
         # Create an array of 0s the same length as test_data
         signal = np.zeros((len(test_data), 1))
     test_data = np.append(test_data, signal, axis=1)
+
+    # Load the model
+    trader = Model(window_size, num_features=test_data.shape[1])
+    trader.model = trader.model_builder()
+    trader.model = trader.model_builder()
+    trader.model.load_weights("models/model_multifeature.h5")
 
     # Use the model to predict the stock price for tomorrow
     state = state_creator(test_data, 0, window_size + 1)
