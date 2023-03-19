@@ -18,9 +18,9 @@ def get_stock_names():
     return stock_names
 
 
-def dataset_loader(stock_name):
+def dataset_downloader(stock_name):
     '''
-    Load stock data.
+    Downloads stock data.
     '''
     # Replace all . with - in stock name (e.g. BRK.B -> BRK-B)
     stock_name = stock_name.replace('.', '-')
@@ -41,7 +41,7 @@ def create_dataset(stock_names, data_folder):
         stock_count += 1
         try:
             print("Downloading data for " + stock_name + " [" + str(stock_count) + "/" + str(len(stock_names)) + "]")
-            data = dataset_loader(stock_name)
+            data = dataset_downloader(stock_name)
             data.to_csv(data_folder + stock_name + '.csv')
         except Exception as e:
             print(e)
