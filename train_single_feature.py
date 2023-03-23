@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import matplotlib.pyplot as plt
 from datetime import *
 from scipy.special import expit
 from tqdm import tqdm
@@ -85,20 +86,75 @@ def train_model(data, model, window_size, episodes, batch_size=32):
                 print("Total Profit: {}".format(format_price(total_profit)))
                 print("--------------------------------")
             
+            # Once we have enough data in memory, we can start training the model in batches
             if len(model.memory) > batch_size:
                 model.batch_train(batch_size)
         
         print("Total Profit: {}".format(format_price(total_profit)))
         print("Saving model...")
-        model.model.save("models/model.h5")
+        model.model.save(f"models/{stock.lower()}.h5")
+
+
+def test_model(data, model, window_size, stock, start_date, end_date):
+    '''
+    Test the trained model by having it trade for a set test period.    
+    For this, we don't use the memory, and we don't need the reward.
+    '''
+    state = state_creator(data, 0, window_size + 1)
+    total_profit = 0
+    model.inventory = []
+    profits = []
+
+    for t in range(len(data)):
+        print("Timestep: {}/{}".format(t, len(data)))
+        action = model.trade(state, is_eval=True)
+        print("Action: {}".format(action))
+        if t == len(data) - 1:
+            # When the episode is done, we don't have a next state, so we set it to the last state
+            next_state = state
+        else:            
+            next_state = state_creator(data, t + 1, window_size + 1)
+
+        # Buy stock
+        if action == 1:
+            model.inventory.append(data[t])
+            print("Buy: {}".format(format_price(data[t])))
+
+        # Sell stock
+        elif action == 2 and len(model.inventory) > 0:
+            bought_price = model.inventory.pop(0) 
+            total_profit += data[t] - bought_price
+            print("Sell: {} | Profit: {}".format(format_price(data[t]), format_price(data[t] - bought_price)))
+
+        # Hold stock
+        elif action == 0:
+            print("Hold: {}".format(format_price(data[t])))
+            pass
+        state = next_state
+
+        # Save the profit for each timestep
+        profits.append(total_profit)
+    print(profits)
+    print("Overall Profit Over Testing Period: {}".format(format_price(total_profit)))
+
+    # Use matplotlib to plot the profit over time
+    plt.plot(profits)
+    plt.xlabel('Time (Days)')
+    plt.ylabel('Profit (USD)')
+    plt.title(f'Profit Over Time for {stock} From {start_date} to {end_date}')
+    plt.legend([f'{stock}'])
+    if not os.path.exists('plots'):
+        os.makedirs('plots')
+    plt.savefig(f'plots/{stock.lower()}.png')
+    plt.show()
 
 
 if __name__ == "__main__":
     window_size = 10
     episodes = 10
-    stock = 'AAPL'
+    stock = 'TSLA'
     
-    data = dataloader(stock, 'data/', '2022-09-01', '2023-03-01')
+    data = dataloader(stock, 'data/', '2022-01-01', '2023-01-01')
     
     # We only want the closing price
     data = data['Close'].values
@@ -113,12 +169,24 @@ if __name__ == "__main__":
     ### Testing the model ###
 
     # Load the model
+    trader = Model(window_size)
     trader.model = trader.model_builder()
-    trader.model.load_weights("models/model1.h5")
-    
+    trader.model.load_weights(f"models/{stock.lower()}.h5")
+
+    # Set start and end date for testing period
+    test_start = '2023-01-02'
+    test_end = '2023-03-02'
+    test_data = dataloader(stock, 'data/', test_start, test_end)
+    test_data = test_data['Close'].values
+
+    # Test the model
+    test_model(test_data, trader, window_size, stock, test_start, test_end)
+    quit()
+
+    ### Testing the model to predict the signal for tomorrow ###
+
     # Get the current date
-    # today = datetime.today().strftime('%Y-%m-%d')
-    today = '2022-08-25'
+    today = datetime.today().strftime('%Y-%m-%d')
 
     # Get the date from a week ago
     week_ago = (datetime.strptime(today, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
