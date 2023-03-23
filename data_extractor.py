@@ -18,6 +18,78 @@ def get_stock_names():
     return stock_names
 
 
+def calculate_technical_indicators(data):
+    '''
+    Given a dataframe of stock data, calculate the following technical indicators:
+    Simple Moving Average (SMA)
+    Exponential Moving Average (EMA)
+    Moving Average Convergence Divergence (MACD)
+    Relative Strength Index (RSI)
+    Commodity Channel Index (CCI)
+    Average Directional Index (ADX)
+    '''
+    # Calculate SMA with a period of 10
+    sma = data["Close"].rolling(window=10).mean()
+
+    # Calculate EMA with a period of 10
+    ema = data["Close"].ewm(span=10, adjust=False).mean()
+
+    # Calculate MACD with fast period of 12, slow period of 26, and signal period of 9
+    ema_12 = data["Close"].ewm(span=12, adjust=False).mean()
+    ema_26 = data["Close"].ewm(span=26, adjust=False).mean()
+    macd = ema_12 - ema_26
+    signal = macd.ewm(span=9, adjust=False).mean()
+    macdhist = macd - signal
+
+    # Calculate RSI with a period of 14
+    delta = data["Close"].diff()
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+    avg_gain = gain.rolling(window=14).mean()
+    avg_loss = loss.rolling(window=14).mean()
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+
+    # Calculate the CCI with a period of 20
+    typical_price = (data["High"] + data["Low"] + data["Close"]) / 3
+    cci = typical_price - typical_price.rolling(window=20).mean()
+    cci /= 0.015 * typical_price.rolling(window=20).std()
+
+    # Calculate the ADX
+    tr = data["High"] - data["Low"]
+    tr1 = data["High"] - data["Close"].shift(1)
+    tr2 = data["Low"] - data["Close"].shift(1)
+    tr = tr.combine(tr1, max)
+    tr = tr.combine(tr2, max)
+    tr = tr.fillna(0)
+    tr_sum = tr.rolling(window=14).sum()
+    tr_sum = tr_sum.fillna(0)
+    dm_plus = data["High"] - data["High"].shift(1)
+    dm_minus = data["Low"].shift(1) - data["Low"]
+    dm_plus = dm_plus.where((dm_plus > 0) & (dm_plus > dm_minus), 0)
+    dm_minus = dm_minus.where((dm_minus > 0) & (dm_minus > dm_plus), 0)
+    dm_plus = dm_plus.fillna(0)
+    dm_minus = dm_minus.fillna(0)
+    dm_plus_ewm = dm_plus.ewm(span=14, adjust=False).mean()
+    dm_minus_ewm = dm_minus.ewm(span=14, adjust=False).mean()
+    di_plus = 100 * dm_plus_ewm / tr_sum
+    di_minus = 100 * dm_minus_ewm / tr_sum
+    dx = 100 * abs(di_plus - di_minus) / (di_plus + di_minus)
+    adx = dx.ewm(span=14, adjust=False).mean()
+
+    # Append the SMA, EMA, MACD, and RSI to the data
+    data["SMA"] = sma
+    data["EMA"] = ema
+    data["MACD"] = macd
+    data["Signal"] = signal
+    data["MACD_Hist"] = macdhist
+    data["RSI"] = rsi
+    data["CCI"] = cci
+    data["ADX"] = adx
+
+    return data
+
+
 def dataset_downloader(stock_name):
     '''
     Downloads stock data.
@@ -25,6 +97,10 @@ def dataset_downloader(stock_name):
     # Replace all . with - in stock name (e.g. BRK.B -> BRK-B)
     stock_name = stock_name.replace('.', '-')
     data = yf.download(stock_name, progress=False) # progress=false to avoid printing progress bar
+
+    # Calculate technical indicators
+    data = calculate_technical_indicators(data)
+
     return data
 
 
@@ -45,9 +121,10 @@ def create_dataset(stock_names, data_folder):
             data.to_csv(data_folder + stock_name + '.csv')
         except Exception as e:
             print(e)
+        break
 
 
-def update_dataset(stock_names, data_folder, force=False):
+def update_dataset(stock_names, data_folder):
     '''
     Given an array of stock tickers and a data folder, 
     append today's data to the end of the csv for each stock.
@@ -81,13 +158,26 @@ def update_dataset(stock_names, data_folder, force=False):
             end_date = datetime.datetime.today() + datetime.timedelta(days=1)
             data = yf.download(stock_name, start=start_date, end=end_date)
 
+            # Append 27 rows from the end of the csv to the start of the new data
+            # This is because MACD needs EMA with a slow period of 26
+            # This is to ensure that the technical indicators are calculated correctly
+            prev_data = pd.read_csv(data_folder + stock_name + '.csv')
+            prev_data = prev_data.tail(27)
+            data = pd.concat([prev_data, data])
+            data = calculate_technical_indicators(data) # Calculate technical indicators
+
+            # Remove the first 27 rows of the new data
+            data = data.iloc[27:]
+
             # Append to existing csv
             with open(data_folder + stock_name + '.csv', mode='a') as f:
                 for index, row in data.iterrows():
                     # Convert index to date string with format YYYY-MM-DD
                     index = index.strftime('%Y-%m-%d')
-                    f.write(str(index) + ',' + str(row['Open']) + ',' + str(row['High']) + ',' + str(row['Low']) + ',' + str(row['Close']) + ',' + str(row['Adj Close']) + ',' + str(int(row['Volume'])))
+                    f.write(str(index) + ',' + str(row['Open']) + ',' + str(row['High']) + ',' + str(row['Low']) + ',' + str(row['Close']) + ',' + str(row['Adj Close']) + ',' + str(int(row['Volume'])) \
+                             + ',' + str(row['SMA']) + ',' + str(row['EMA']) + ',' + str(row['MACD']) + ',' + str(row['Signal']) + ',' + str(row['MACD_Hist']) + ',' + str(row['RSI']) + ',' + str(row['CCI']) + ',' + str(row['ADX']))
                     f.write("\n")
+            break
         except Exception as e:
             print("Error updating data for " + stock_name + " [" + str(stock_count) + "/" + str(len(stock_names)) + "]")
             print(e)
@@ -137,10 +227,10 @@ if __name__ == "__main__":
     # print(stock_names)
 
     # This will download the entire history for each stock and save it to the data folder
-    create_dataset(stock_names, 'data/')
+    # create_dataset(stock_names, 'data/')
 
     # This is the function you run daily to update the dataset with new data
-    # update_dataset(stock_names, 'data/', force=True)
+    update_dataset(stock_names, 'data/')
 
     # This is how you load the data
     data = dataloader('AAPL', 'data/', '2023-03-07', '2023-03-10')
