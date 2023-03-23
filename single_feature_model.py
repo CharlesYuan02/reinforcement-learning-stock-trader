@@ -40,13 +40,13 @@ class Model():
         self.model = model
         return model
     
-    def trade(self, state):
+    def trade(self, state, is_eval=False):
         '''
         The model generates a random floating point number between 0 and 1. 
         If the number is less than epsilon, the model will explore the environment randomly.
         If the number is greater than epsilon, the model will exploit the environment by choosing the best action.
         '''
-        if random.random() <= self.epsilon:
+        if not is_eval and random.random() <= self.epsilon:
             return random.randrange(self.action_space)
         state = state.reshape(1, 1, -1) # Reshape the state to have shape (1, 1, state_size)
         actions = self.model.predict(state, verbose=0)
