@@ -203,7 +203,11 @@ def label_buy_sell_hold(data, threshold=0.02):
     Otherwise, append 0 for hold.
     You can change the threshold to fit your trading risk tolerance.
     '''
-    # Convert data from (124, 1) to (124,)
+    # We only want the first column of values (Close price), but only if it's a 2D array
+    if len(data.shape) == 2:
+        data = data[:, 0]
+
+    # Convert data from (length, 1) to (length,)
     data = data.reshape(-1)
     labels = []
     for i in range(len(data)):
