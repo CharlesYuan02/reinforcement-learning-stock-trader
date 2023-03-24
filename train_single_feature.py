@@ -152,7 +152,7 @@ def test_model(data, model, window_size, stock, start_date, end_date):
 if __name__ == "__main__":
     window_size = 10
     episodes = 10
-    stock = 'TSLA'
+    stock = 'GOOGL'
     
     data = dataloader(stock, 'data/', '2022-01-01', '2023-01-01')
     
