@@ -29,21 +29,21 @@ class Model():
 
     def model_builder(self):
         model = tf.keras.Sequential()
-        model.add(tf.keras.layers.Dense(units=32, activation="relu", input_shape=(None, self.state_size, self.num_features)))
-        model.add(tf.keras.layers.Dense(units=64, activation="relu"))
+        model.add(tf.keras.layers.Dense(units=64, activation="relu", input_shape=(None, self.state_size, self.num_features)))
         model.add(tf.keras.layers.Dense(units=128, activation="relu"))
+        model.add(tf.keras.layers.Dense(units=256, activation="relu"))
         model.add(tf.keras.layers.Dense(self.action_space, activation="linear")) # We use linear activation cuz it's a regression task w/ no set range
-        model.compile(loss="mse", optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3))
+        model.compile(loss="mse", optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5))
         self.model = model
         return model
     
-    def trade(self, state):
+    def trade(self, state, is_eval=False):
         '''
         The model generates a random floating point number between 0 and 1. 
         If the number is less than epsilon, the model will explore the environment randomly.
         If the number is greater than epsilon, the model will exploit the environment by choosing the best action.
         '''
-        if random.random() <= self.epsilon:
+        if random.random() <= self.epsilon and not is_eval:
             return random.randrange(self.action_space)
         state = state.reshape(-1, 1, self.state_size, self.num_features) # Reshape the state to have shape (batch_size, state_size, num_features)
         # state = np.expand_dims(state, axis=0) # Add a dimension to the state to have shape (batch_size, 1, state_size, num_features)
