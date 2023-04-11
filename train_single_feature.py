@@ -5,8 +5,28 @@ from datetime import *
 from scipy.special import expit
 from tqdm import tqdm
 from data_extractor import dataloader
-from single_feature_model import Model
+from continuous_single_feature_model import Model
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+def calculate_reward(inventory, closing_price, sold_profit=0):
+    '''
+    An improved reward function (based on feedback from the interim report)
+    that takes into account the value of the portfolio itself, not just the profit gained from selling the stocks.
+    '''
+    # Get the number of stocks in portfolio
+    num_stocks = len(inventory)
+
+    # Calculate the total value of the portfolio based on today's closing price
+    total_portfolio_value = num_stocks * closing_price
+
+    # Subtract the initial investment from the total portfolio value to get the total profit
+    initial_investment = sum(inventory)
+    total_profit = total_portfolio_value - initial_investment
+
+    # Add the portfolio profit to the profit gained from selling the stocks (if any)
+    total_profit += sold_profit
+
+    return total_profit # This is your reward
 
 
 def format_price(n):
@@ -62,17 +82,21 @@ def train_model(data, model, window_size, episodes, batch_size=32):
             # Buy stock
             if action == 1:
                 model.inventory.append(data[t])
+                reward = calculate_reward(model.inventory, data[t])
                 # print("Buy: {}".format(format_price(data[t])))
 
             # Sell stock
             elif action == 2 and len(model.inventory) > 0:
                 bought_price = model.inventory.pop(0) 
-                reward = max(data[t] - bought_price, 0) # reward >= 0
+                # reward = max(data[t] - bought_price, 0)
+                profit = data[t] - bought_price
+                reward = calculate_reward(model.inventory, data[t], profit)
                 total_profit += data[t] - bought_price
                 # print("Sell: {} | Profit: {}".format(format_price(data[t]), format_price(data[t] - bought_price)))
 
             # Hold stock
             elif action == 0:
+                reward = calculate_reward(model.inventory, data[t])
                 # print("Hold: {}".format(format_price(data[t])))
                 pass
             
@@ -152,13 +176,16 @@ def test_model(data, model, window_size, stock, start_date, end_date):
 if __name__ == "__main__":
     window_size = 10
     episodes = 10
-    stock = 'GOOGL'
+    stock = 'AMZN'
     
     data = dataloader(stock, 'data/', '2022-01-01', '2023-01-01')
     
     # We only want the closing price
     data = data['Close'].values
     batch_size = 32
+
+    # Define the max amount of shares to buy/sell at a time, k
+    k = 10
 
     trader = Model(window_size)
     trader.model = trader.model_builder()
