@@ -1,11 +1,6 @@
 import gym
-import pandas as pd
-import matplotlib.pyplot as plt
 import numpy as np
 from gym import spaces
-from stable_baselines3 import A2C, PPO
-from stable_baselines3.common.callbacks import EvalCallback
-from stable_baselines3.common.vec_env import DummyVecEnv
 
 
 class CustomStockTradingEnv(gym.Env):
@@ -126,77 +121,3 @@ class CustomStockTradingEnv(gym.Env):
         Return the closing price for the current day
         '''
         return self.prices[self.current_step]     
-
-stock = "AMZN"
-k_value = 1000
-starting_balance = 100000
-df = pd.read_csv(f'data/{stock}.csv')
-
-# Only use data from 2021-01-01 to 2023-01-01
-df = df[(df["Date"] >= "2021-01-01") & (df["Date"] <= "2023-01-01")]
-df = df[["Date", "Close", "MACD", "Signal", "RSI", "CCI", "ADX"]]
-df["Date"] = pd.to_datetime(df["Date"], format="%Y-%m-%d")
-df.set_index("Date", inplace=True)
-
-env = CustomStockTradingEnv(df, window_size=10, k=k_value, starting_balance=starting_balance)
-env = DummyVecEnv([lambda: env])
-eval_callback = EvalCallback(env, eval_freq=100, n_eval_episodes=5)
-model = PPO('MlpPolicy', env, gamma=0.99, verbose=0)
-# model.learn(total_timesteps=250, callback=[eval_callback])
-model.learn(total_timesteps=250)
-
-obs = env.reset()
-for i in range(len(df)):
-    action, _ = model.predict(obs)
-    obs, reward, done, info = env.step(action)
-    if done:
-        info = info[0]
-        account_balances = info['account_balance']
-        num_shares = info['num_shares']
-        total_portfolio_value = info['total_portfolio_value']
-        break
-
-print("Account balance: {}".format(account_balances[-1]))
-print("Number of shares: {}".format(num_shares[-1]))
-print("Total portfolio value: {}".format(total_portfolio_value[-1]))
-
-# Plot training results
-# plt.figure(figsize=(15, 6))
-# plt.plot(total_portfolio_value, label='Portfolio value')
-# plt.show()
-
-# Evaluation/testing
-df = pd.read_csv(f'data/{stock}.csv')
-df = df[(df["Date"] >= "2023-01-01")]
-df = df[["Date", "Close", "MACD", "Signal", "RSI", "CCI", "ADX"]]
-df["Date"] = pd.to_datetime(df["Date"], format="%Y-%m-%d")
-df.set_index("Date", inplace=True)
-
-# Create the environment used to test the agent
-env = CustomStockTradingEnv(df, window_size=10, k=k_value, starting_balance=starting_balance)
-env = DummyVecEnv([lambda: env])
-obs = env.reset()
-for i in range(len(df)):
-    action, _ = model.predict(obs)
-    obs, reward, done, info = env.step(action)
-    if done:
-        info = info[0]
-        account_balances = info['account_balance']
-        num_shares = info['num_shares']
-        total_portfolio_value = info['total_portfolio_value']
-        break
-
-# Length is len(df) - window_size = 46
-print(len(df), len(total_portfolio_value))
-
-print("Account balance: {}".format(account_balances[-1]))
-print("Number of shares: {}".format(num_shares[-1]))
-print("Total portfolio value: {}".format(total_portfolio_value[-1]))
-
-# Plot testing results
-plt.figure(figsize=(15, 6))
-plt.plot(total_portfolio_value, label='Portfolio value')
-plt.title(f"Portfolio Value, {stock} Stock")
-plt.xlabel("Day (Jan 2023 - Present)")
-plt.ylabel("Portfolio Value ($)")
-plt.show()
