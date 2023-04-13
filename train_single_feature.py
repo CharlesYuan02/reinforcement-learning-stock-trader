@@ -5,7 +5,7 @@ from datetime import *
 from scipy.special import expit
 from tqdm import tqdm
 from data_extractor import dataloader
-from continuous_single_feature_model import Model
+from single_feature_model import Model
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 def calculate_reward(inventory, closing_price, sold_profit=0):
@@ -25,6 +25,9 @@ def calculate_reward(inventory, closing_price, sold_profit=0):
 
     # Add the portfolio profit to the profit gained from selling the stocks (if any)
     total_profit += sold_profit
+
+    # Clip the reward to be between -1 and 1
+    total_profit = np.clip(total_profit, -1, 1)
 
     return total_profit # This is your reward
 
@@ -175,17 +178,14 @@ def test_model(data, model, window_size, stock, start_date, end_date):
 
 if __name__ == "__main__":
     window_size = 10
-    episodes = 10
+    episodes = 5
     stock = 'AMZN'
     
-    data = dataloader(stock, 'data/', '2022-01-01', '2023-01-01')
+    data = dataloader(stock, 'data/', '2021-01-01', '2023-01-01')
     
     # We only want the closing price
     data = data['Close'].values
     batch_size = 32
-
-    # Define the max amount of shares to buy/sell at a time, k
-    k = 10
 
     trader = Model(window_size)
     trader.model = trader.model_builder()
