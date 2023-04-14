@@ -48,6 +48,7 @@ class CustomStockTradingEnv(gym.Env):
         return self._next_observation()
     
     def _next_observation(self):
+        # Shape of obs: (window_size, num_features)
         obs = np.array([
             self.prices[(self.current_step - self.window_size):self.current_step],
             self.macd[(self.current_step - self.window_size):self.current_step],
