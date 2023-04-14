@@ -100,27 +100,29 @@ class CustomStockTradingEnv(gym.Env):
         new_account_balance = self.account_balance[-1] # Scalar
         new_num_shares = self.num_shares[-1].copy() # List
         new_total_portfolio_value = self.total_portfolio_value[-1] # Scalar
+        # print(new_total_portfolio_value, new_account_balance, new_num_shares)
 
         # Loop through each stock and perform buy/sell action
         for i in range(len(actions)): # For each stock, do the same thing as for single-stock training
+            # print(new_account_balance) # The balance never goes negative, so I know the model isn't cheating...
             # Buy if action > 0 and if you have enough money
-            if actions[i] > 0 and self.account_balance[-1] > current_price[i]:
+            if actions[i] > 0 and new_account_balance > current_price[i]:
                 # Convert float to number of shares based on set "k" value (max number of shares to buy)
                 # If you don't have enough money, just buy as many as you can
                 # Since we have multiple stocks, just use a simple rule and divide k by the number of stocks
                 k_new = self.k / self.num_stocks
-                shares_bought = min(int(self.account_balance[-1] / current_price[i]), int(actions[i] * k_new))
+                shares_bought = min(int(new_account_balance / current_price[i]), int(actions[i] * k_new))
                 new_account_balance -= shares_bought * current_price[i]
                 new_num_shares[i] += shares_bought # This is the new number of shares for this stock
                 new_total_portfolio_value += shares_bought * current_price[i]
                 self.trades += 1
                 
             # Sell if action < 0 and if you have enough shares
-            elif actions[i] < 0 and self.num_shares[-1][i] > 0:
+            elif actions[i] < 0 and new_num_shares[i] > 0:
                 # Convert float to number of shares based on set "k" value (max number of shares to sell)
                 # If you don't have enough shares, just sell as many as you can
                 k_new = self.k / self.num_stocks
-                shares_sold = min(self.num_shares[-1][i], int(-actions[i] * k_new))
+                shares_sold = min(new_num_shares[i], int(-actions[i] * k_new)) # Min because actions[i] is negative
                 new_account_balance += shares_sold * current_price[i]
                 new_num_shares[i] -= shares_sold # This is the new number of shares for this stock
                 new_total_portfolio_value -= shares_sold * current_price[i]

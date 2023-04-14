@@ -8,6 +8,23 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from custom_environment_multistock import CustomStockTradingEnv
 
 
+def plot_portfolio(num_shares, stocks, start_date, end_date):
+    '''
+    Given the array of number of shares, plot the amount of each stock
+    in the portfolio over time.    
+    '''
+    plt.figure(figsize=(15, 6))
+    num_shares = np.array(num_shares)
+    for i in range(num_shares.shape[1]):
+        plt.plot(range(num_shares.shape[0]), num_shares[:, i], label=stocks[i])
+    plt.title(f"Portfolio Shares")
+    plt.xlabel(f"Day {start_date} - {end_date}")
+    plt.ylabel("Number of Shares")
+    plt.legend()
+    plt.savefig(f"plots/portfolio_shares.png")
+    plt.show()
+
+
 def train(stocks, start_date, end_date, 
           model_name="PPO", features=["Date", "Close", "MACD", "Signal", "RSI", "CCI", "ADX"], 
           window_size=10, k_value=1000, starting_balance=100000, gamma=0.99, num_timesteps=250):
@@ -92,15 +109,17 @@ def evaluate(stocks, start_date, end_date, trained_model,
     dfs = []
     for stock in stocks:
         df = pd.read_csv(f'data/{stock}.csv')
-        df = df[(df["Date"] >= start_date) & (df["Date"] <= end_date)]
+        if end_date is None or end_date == "Present":
+            df = df[df["Date"] >= start_date]
+            end_date = "Present"
+        else:
+            df = df[(df["Date"] >= start_date) & (df["Date"] <= end_date)]
         df = df[features]
         df["Date"] = pd.to_datetime(df["Date"], format="%Y-%m-%d")
         df.set_index("Date", inplace=True)
         dfs.append(df)
-    df_concat = pd.concat(dfs, axis=1)
-
     # Create the environment used to test the agent
-    env = CustomStockTradingEnv(df_concat, window_size=window_size, k=k_value, starting_balance=starting_balance)
+    env = CustomStockTradingEnv(dfs, window_size=window_size, k=k_value, starting_balance=starting_balance)
     env = DummyVecEnv([lambda: env])
     if trained_model.endswith("PPO"):
         model = PPO.load(trained_model)
@@ -110,7 +129,7 @@ def evaluate(stocks, start_date, end_date, trained_model,
         raise ValueError("Please select PPO or A2C")
 
     obs = env.reset()
-    for i in range(len(df_concat[0])):
+    for i in range(np.array(dfs).shape[1]):
         action, _ = model.predict(obs)
         obs, reward, done, info = env.step(action)
         if done:
@@ -136,21 +155,22 @@ def evaluate(stocks, start_date, end_date, trained_model,
     plt.savefig(f"plots/testing_multistock_{trained_model.split('_')[-1]}.png")
     plt.show()
 
+    plot_portfolio(num_shares, stocks, start_date, end_date)
+
 
 if __name__ == "__main__":
     # Training 
-    stocks = ["AAPL", "MSFT", "AMZN", "NVDA", "GOOGL"]
+    stocks = ["AAPL", "MSFT", "AMZN", "NVDA", "GOOGL", "TSLA", "AMD", "EA", "QCOM", "ADBE"]
     start_train = "2021-01-01"
     end_train = "2023-01-01"
     model = "PPO"
     features = ["Date", "Close", "MACD", "Signal", "RSI", "CCI", "ADX"]
     window_size = 10
-    k_value = 1000
+    k_value = 1000 / len(stocks)
     starting_balance = 100000
     gamma = 0.99
     num_timesteps = 250
-    train(stocks, start_train, end_train, model, features, window_size, k_value, starting_balance, gamma, num_timesteps)
-    quit()
+    # train(stocks, start_train, end_train, model, features, window_size, k_value, starting_balance, gamma, num_timesteps)
 
     # Evaluation
     start_test = "2023-01-01"
