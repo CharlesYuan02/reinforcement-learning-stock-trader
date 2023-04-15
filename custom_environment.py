@@ -79,8 +79,7 @@ class CustomStockTradingEnv(gym.Env):
             * This includes the profit made upon selling some shares
         2. Current value of the portfolio (i.e. num_shares * current_price)
         '''
-        # raw_reward = self.total_portfolio_value[-1] - self.total_portfolio_value[-2] # Basically the same thing after clipping
-        raw_reward = self.account_balance[-1] - self.account_balance[-2] + self.num_shares[-1] * self._get_current_price()
+        raw_reward = self.total_portfolio_value[-1] - self.total_portfolio_value[-2]
         reward = np.clip(raw_reward, -1, 1) # Clip reward to be between -1 and 1
         return reward
     

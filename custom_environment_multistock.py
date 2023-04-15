@@ -87,8 +87,9 @@ class CustomStockTradingEnv(gym.Env):
         # raw_reward = self.total_portfolio_value[-1] - self.total_portfolio_value[-2] # Basically the same thing after clipping
         # self._get_current_price() returns an array of size (num_stocks, 1)
         # Do element-wise multiplication for the amount of each stock at most recent time step with the current prices for each stock
-        current_portfolio_value = np.sum(np.array(self.num_shares[-1]) * np.array(self._get_current_price()))
-        raw_reward = self.account_balance[-1] - self.account_balance[-2] + current_portfolio_value - self.total_portfolio_value[-1]
+        # current_portfolio_value = np.sum(np.array(self.num_shares[-1]) * np.array(self._get_current_price()))
+        # raw_reward = self.account_balance[-1] - self.account_balance[-2] + current_portfolio_value - self.total_portfolio_value[-1]
+        raw_reward = self.total_portfolio_value[-1] - self.total_portfolio_value[-2]
         reward = np.clip(raw_reward, -1, 1) # Clip reward to be between -1 and 1
         return reward
     
@@ -109,9 +110,7 @@ class CustomStockTradingEnv(gym.Env):
             if actions[i] > 0 and new_account_balance > current_price[i]:
                 # Convert float to number of shares based on set "k" value (max number of shares to buy)
                 # If you don't have enough money, just buy as many as you can
-                # Since we have multiple stocks, just use a simple rule and divide k by the number of stocks
-                k_new = self.k / self.num_stocks
-                shares_bought = min(int(new_account_balance / current_price[i]), int(actions[i] * k_new))
+                shares_bought = min(int(new_account_balance / current_price[i]), int(actions[i] * self.k))
                 new_account_balance -= shares_bought * current_price[i]
                 new_num_shares[i] += shares_bought # This is the new number of shares for this stock
                 new_total_portfolio_value += shares_bought * current_price[i]
@@ -121,8 +120,7 @@ class CustomStockTradingEnv(gym.Env):
             elif actions[i] < 0 and new_num_shares[i] > 0:
                 # Convert float to number of shares based on set "k" value (max number of shares to sell)
                 # If you don't have enough shares, just sell as many as you can
-                k_new = self.k / self.num_stocks
-                shares_sold = min(new_num_shares[i], int(-actions[i] * k_new)) # Min because actions[i] is negative
+                shares_sold = min(new_num_shares[i], int(-actions[i] * self.k)) # Min because actions[i] is negative
                 new_account_balance += shares_sold * current_price[i]
                 new_num_shares[i] -= shares_sold # This is the new number of shares for this stock
                 new_total_portfolio_value -= shares_sold * current_price[i]
