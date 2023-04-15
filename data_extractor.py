@@ -121,7 +121,6 @@ def create_dataset(stock_names, data_folder):
             data.to_csv(data_folder + stock_name + '.csv')
         except Exception as e:
             print(e)
-        break
 
 
 def update_dataset(stock_names, data_folder):
@@ -177,7 +176,6 @@ def update_dataset(stock_names, data_folder):
                     f.write(str(index) + ',' + str(row['Open']) + ',' + str(row['High']) + ',' + str(row['Low']) + ',' + str(row['Close']) + ',' + str(row['Adj Close']) + ',' + str(int(row['Volume'])) \
                              + ',' + str(row['SMA']) + ',' + str(row['EMA']) + ',' + str(row['MACD']) + ',' + str(row['Signal']) + ',' + str(row['MACD_Hist']) + ',' + str(row['RSI']) + ',' + str(row['CCI']) + ',' + str(row['ADX']))
                     f.write("\n")
-            break
         except Exception as e:
             print("Error updating data for " + stock_name + " [" + str(stock_count) + "/" + str(len(stock_names)) + "]")
             print(e)
